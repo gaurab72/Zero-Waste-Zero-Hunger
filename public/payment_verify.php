@@ -1,55 +1,55 @@
 <?php
-/**
- * Payment verification handler (eSewa, Khalti, PayPal, etc.)
- */
 require_once '../config/db.php';
+require_once '../config/payments.php';
 require_once '../src/functions.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ─── eSewa v2 Config (test/sandbox) ────────────────────────────────────────
-define('ESEWA_PRODUCT_CODE', 'EPAYTEST');
-define('ESEWA_SECRET_KEY',   '8gBm/:&EnhH.1/q');
-define('ESEWA_PAYMENT_URL',  'https://rc-epay.esewa.com.np/api/epay/main/v2/form');
-define('ESEWA_STATUS_URL',   'https://rc.esewa.com.np/api/epay/transaction/status/');
+function verifyPostJson(string $url, array $payload, array $headers = []): array {
+    $headers[] = 'Content-Type: application/json';
+    $body = json_encode($payload);
 
-// ─── Helper: verify HMAC‑SHA256 signature from eSewa response ────────────────
-function verifyEsewaResponseSignature(array $data): bool {
-    if (empty($data['signed_field_names']) || empty($data['signature'])) {
-        return false;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        $raw = curl_exec($curl);
+        $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headers),
+                'content' => $body,
+                'timeout' => 30,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
+        $code = 0;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
+            $code = (int) $matches[1];
+        }
     }
-    $fields = explode(',', $data['signed_field_names']);
-    $parts = [];
-    foreach ($fields as $field) {
-        $field = trim($field);
-        if (!isset($data[$field])) return false;
-        $parts[] = "{$field}={$data[$field]}";
-    }
-    $message = implode(',', $parts);
-    $expectedSig = base64_encode(hash_hmac('sha256', $message, ESEWA_SECRET_KEY, true));
-    return hash_equals($expectedSig, $data['signature']);
+
+    $data = json_decode((string) $raw, true);
+    return ['code' => $code, 'body' => is_array($data) ? $data : []];
 }
 
-// ─── Helper: call eSewa Status Check API ───────────────────────────────────
-function checkEsewaStatus(string $txUuid, float $totalAmount): ?array {
-    $url = ESEWA_STATUS_URL . '?' . http_build_query([
-        'product_code'     => ESEWA_PRODUCT_CODE,
-        'total_amount'     => $totalAmount,
-        'transaction_uuid' => $txUuid,
-    ]);
-    $ctx = stream_context_create(['http' => ['timeout' => 15]]);
-    $raw = @file_get_contents($url, false, $ctx);
-    if ($raw === false) return null;
-    return json_decode($raw, true);
-}
-
-// ─── Determine payment method ───────────────────────────────────────────────
-function renderPaymentSuccess(string $name, float $amount, string $transactionId, string $method = 'eSewa', string $note = ''): void {
+function renderPaymentSuccess(string $name, float $amount, string $transactionId, string $method, string $currency = 'NPR', string $note = ''): void {
     $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
     $safeMethod = htmlspecialchars($method, ENT_QUOTES, 'UTF-8');
     $safeTransactionId = htmlspecialchars($transactionId, ENT_QUOTES, 'UTF-8');
     $safeNote = htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
+    $safeCurrency = htmlspecialchars($currency, ENT_QUOTES, 'UTF-8');
     $formattedAmount = number_format($amount, 2);
     ?>
     <!DOCTYPE html>
@@ -71,7 +71,6 @@ function renderPaymentSuccess(string $name, float $amount, string $transactionId
             .payment-details span:first-child { color: #4b5563; }
             .payment-details span:last-child { color: #111827; font-weight: 700; text-align: right; }
             .home-btn { display: inline-block; margin-top: 8px; padding: 12px 24px; background: #16a34a; color: #fff; text-decoration: none; border-radius: 10px; font-weight: 700; }
-            .home-btn:hover { background: #15803d; }
         </style>
     </head>
     <body>
@@ -79,14 +78,10 @@ function renderPaymentSuccess(string $name, float $amount, string $transactionId
             <div class="payment-icon">&#10003;</div>
             <h1>Payment Successful</h1>
             <p>Thank you, <?= $safeName ?>. Your payment has been confirmed.</p>
-            <?php if ($safeNote !== ''): ?>
-                <p class="payment-note"><?= $safeNote ?></p>
-            <?php else: ?>
-                <p>Your donation has been recorded successfully.</p>
-            <?php endif; ?>
+            <?php if ($safeNote !== ''): ?><p class="payment-note"><?= $safeNote ?></p><?php else: ?><p>Your donation has been recorded successfully.</p><?php endif; ?>
             <section class="payment-details" aria-label="Payment details">
                 <div><span>Method</span><span><?= $safeMethod ?></span></div>
-                <div><span>Amount</span><span>Rs. <?= $formattedAmount ?></span></div>
+                <div><span>Amount</span><span><?= $safeCurrency ?> <?= $formattedAmount ?></span></div>
                 <div><span>Transaction ID</span><span><?= $safeTransactionId ?></span></div>
             </section>
             <a class="home-btn" href="index.php">Go to Home</a>
@@ -115,10 +110,7 @@ function renderPaymentFailure(string $title, string $message, string $method = '
             .payment-icon { width: 72px; height: 72px; border-radius: 50%; background: #dc2626; color: #fff; display: grid; place-items: center; font-size: 42px; margin: 0 auto 18px; }
             .payment-card h1 { margin: 0 0 10px; color: #7f1d1d; }
             .payment-card p { color: #4b5563; line-height: 1.6; }
-            .payment-details { margin: 24px 0; padding: 18px; background: #fef2f2; border-radius: 12px; text-align: left; }
-            .payment-details div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
-            .payment-details span:last-child { font-weight: 700; text-align: right; }
-            .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+            .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
             .btn { display: inline-block; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: 700; }
             .btn-primary { background: #16a34a; color: #fff; }
             .btn-secondary { background: #fee2e2; color: #991b1b; }
@@ -129,10 +121,7 @@ function renderPaymentFailure(string $title, string $message, string $method = '
             <div class="payment-icon">!</div>
             <h1><?= $safeTitle ?></h1>
             <p><?= $safeMessage ?></p>
-            <section class="payment-details" aria-label="Payment status">
-                <div><span>Method</span><span><?= $safeMethod ?></span></div>
-                <div><span>Status</span><span>Failed / Cancelled</span></div>
-            </section>
+            <p><strong>Method:</strong> <?= $safeMethod ?></p>
             <div class="actions">
                 <a class="btn btn-secondary" href="donate_money.php">Try Again</a>
                 <a class="btn btn-primary" href="index.php">Go to Home</a>
@@ -144,114 +133,86 @@ function renderPaymentFailure(string $title, string $message, string $method = '
     exit;
 }
 
+function saveVerifiedDonation(PDO $pdo, string $method, string $transactionId, string $currency, string $note = ''): array {
+    $pending = $_SESSION['pending_donation'] ?? [];
+    $amount = isset($pending['amount']) ? (float) $pending['amount'] : 0;
+    $name = $pending['donor_name'] ?? 'Anonymous';
+    $message = trim(($pending['message'] ?? '') . ($note !== '' ? ' ' . $note : ''));
+    $anonymous = $pending['is_anonymous'] ?? 0;
+    $userId = $_SESSION['user_id'] ?? null;
+    $receiverId = $pending['receiver_id'] ?? null;
 
+    if ($amount <= 0) {
+        renderPaymentFailure('Invalid Donation Amount', 'The payment amount was invalid, so the donation could not be recorded.', $method);
+    }
+
+    try {
+        $stmt = $pdo->prepare("INSERT INTO money_donations (donor_name, amount, message, is_anonymous, user_id, receiver_id, payment_method, transaction_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $amount, $message, $anonymous, $userId, $receiverId, $method, $transactionId]);
+        addNotification($pdo, ucfirst($method) . ' Donation', $currency . ' ' . number_format($amount, 2) . " from $name | Tx: $transactionId");
+    } catch (PDOException $e) {
+        if ($e->getCode() !== '23000') {
+            renderPaymentFailure('Donation Save Failed', 'The payment was verified, but the donation could not be saved in the database.', ucfirst($method));
+        }
+    }
+
+    return ['name' => (string) $name, 'amount' => $amount];
+}
 
 $method = $_GET['method'] ?? '';
 
-// eSewa may append its success payload as "?data=..." even when the success URL
-// already contains a query string, producing "?method=esewa?data=...". Normalize
-// that malformed callback so the verifier still receives method=esewa and data=... .
-if (strpos($method, '?') !== false) {
-    [$methodValue, $extraQuery] = explode('?', $method, 2);
-    $method = $methodValue;
-
-    parse_str($extraQuery, $extraParams);
-    foreach ($extraParams as $key => $value) {
-        if (!isset($_GET[$key])) {
-            $_GET[$key] = $value;
-        }
-    }
-}
-
-if ($method === '' && isset($_GET['data'])) {
-    $method = 'esewa';
-}
-if ($method === 'esewa') {
-    // ─── eSewa failure path ───────────────────────────────────────────────
-    if (isset($_GET['status']) && $_GET['status'] === 'failed') {
-        unset($_SESSION['esewa_tx_uuid'], $_SESSION['esewa_total_amount']);
-        renderPaymentFailure('eSewa Payment Failed', 'The payment was cancelled or failed in eSewa. No donation was recorded.', 'eSewa');
+if ($method === 'khalti') {
+    $callbackStatus = $_GET['status'] ?? '';
+    if ($callbackStatus !== '' && $callbackStatus !== 'Completed') {
+        unset($_SESSION['pending_donation'], $_SESSION['khalti_pidx']);
+        renderPaymentFailure('Khalti Payment Not Complete', 'Khalti did not complete this transaction. No donation was recorded.', 'Khalti');
     }
 
-    // ─── eSewa success path ───────────────────────────────────────────────
-    $encodedData = $_GET['data'] ?? '';
-    if (empty($encodedData)) {
-        renderPaymentFailure('eSewa Verification Failed', 'eSewa did not return payment data, so the payment could not be confirmed.', 'eSewa');
+    $pidx = $_GET['pidx'] ?? ($_SESSION['khalti_pidx'] ?? '');
+    if ($pidx === '' || $pidx !== ($_SESSION['khalti_pidx'] ?? '')) {
+        renderPaymentFailure('Khalti Verification Failed', 'The Khalti payment session did not match this browser session.', 'Khalti');
     }
-    $decoded = base64_decode($encodedData, true);
-    if ($decoded === false) {
-        renderPaymentFailure('eSewa Verification Failed', 'The eSewa response could not be decoded. Payment was not confirmed by this system.', 'eSewa');
+    if (KHALTI_SECRET_KEY === '') {
+        renderPaymentFailure('Khalti Verification Failed', 'Khalti secret key is not configured.', 'Khalti');
     }
-    $esewaData = json_decode($decoded, true);
-    if (!is_array($esewaData)) {
-        renderPaymentFailure('eSewa Verification Failed', 'The eSewa response format was invalid. Payment was not confirmed by this system.', 'eSewa');
+
+    $lookup = verifyPostJson(KHALTI_BASE_URL . 'epayment/lookup/', ['pidx' => $pidx], ['Authorization: Key ' . KHALTI_SECRET_KEY]);
+    $body = $lookup['body'];
+    $expectedPaisa = (int) ($_SESSION['pending_donation']['amount_paisa'] ?? 0);
+    $actualPaisa = (int) ($body['total_amount'] ?? 0);
+
+    if (($body['status'] ?? '') !== 'Completed' || $actualPaisa !== $expectedPaisa) {
+        renderPaymentFailure('Khalti Verification Failed', 'Khalti lookup did not confirm this payment amount as completed.', 'Khalti');
     }
-    // Verify signature
-    if (!verifyEsewaResponseSignature($esewaData)) {
-        renderPaymentFailure('eSewa Verification Failed', 'The eSewa security signature was invalid. Payment was not accepted.', 'eSewa');
-    }
-    // Compare with session values
-    $txUuid = $esewaData['transaction_uuid'] ?? '';
-    $txAmount = (float)($esewaData['total_amount'] ?? 0);
-    $sessionUuid = $_SESSION['esewa_tx_uuid'] ?? '';
-    $sessionAmount = (float)($_SESSION['esewa_total_amount'] ?? 0);
-    $hasValidSessionDonation = ($txUuid === $sessionUuid && $txAmount === $sessionAmount);
-    // Double‑check via status API
-    $statusResp = checkEsewaStatus($txUuid, $txAmount);
-    $confirmedStatus = $statusResp['status'] ?? 'UNKNOWN';
-    if ($esewaData['status'] !== 'COMPLETE' || $confirmedStatus !== 'COMPLETE') {
-        renderPaymentFailure('eSewa Payment Not Complete', 'eSewa did not confirm this transaction as COMPLETE. No donation was recorded.', 'eSewa');
-    }
-    // All good – record donation
-    $amount      = $hasValidSessionDonation ? ($_SESSION['pending_donation']['amount'] ?? $txAmount) : $txAmount;
-    $name        = $hasValidSessionDonation ? ($_SESSION['pending_donation']['donor_name'] ?? 'Anonymous') : 'Donor';
-    $msg         = $hasValidSessionDonation ? ($_SESSION['pending_donation']['message'] ?? '') : '';
-    $anon        = $hasValidSessionDonation ? ($_SESSION['pending_donation']['is_anonymous'] ?? 0) : 0;
-    $user_id     = $hasValidSessionDonation ? ($_SESSION['user_id'] ?? null) : null;
-    $receiver_id = $hasValidSessionDonation ? ($_SESSION['pending_donation']['receiver_id'] ?? null) : null;
-    $txCode      = $esewaData['transaction_code']                ?? $txUuid;
-    $paymentSaved = false;
-    $paymentNote = $hasValidSessionDonation ? '' : 'Payment was verified by eSewa, but the browser session was not available for donor details. The page is kept here instead of redirecting.';
-    if ($amount > 0) {
-        try {
-            $stmt = $pdo->prepare("INSERT INTO money_donations (donor_name, amount, message, is_anonymous, user_id, receiver_id, payment_method, transaction_id) VALUES (?, ?, ?, ?, ?, ?, 'esewa', ?)");
-            $stmt->execute([$name, $amount, $msg, $anon, $user_id, $receiver_id, $txCode]);
-            addNotification($pdo, 'eSewa Donation', "Rs. " . number_format($amount) . " from $name | Tx: $txCode");
-            $paymentSaved = true;
-        } catch (PDOException $e) {
-            $paymentNote = 'Payment was verified by eSewa, but it could not be recorded again in the database. Transaction may already exist.';
-        }
-    } else {
-        renderPaymentFailure('Invalid Donation Amount', 'The payment amount was invalid, so the donation could not be recorded.', 'eSewa');
-    }
-    // Clean up
-    unset($_SESSION['pending_donation'], $_SESSION['esewa_tx_uuid'], $_SESSION['esewa_total_amount']);
-    renderPaymentSuccess((string)$name, (float)$amount, (string)$txCode, 'eSewa', $paymentNote);
+
+    $transactionId = (string) ($body['transaction_id'] ?? $pidx);
+    $saved = saveVerifiedDonation($pdo, 'khalti', $transactionId, 'NPR');
+    unset($_SESSION['pending_donation'], $_SESSION['khalti_pidx']);
+    renderPaymentSuccess($saved['name'], $saved['amount'], $transactionId, 'Khalti', 'NPR');
 }
 
-// ─── Non‑eSewa methods (Khalti, PayPal, etc.) ────────────────────────────────
-$status = $_GET['status'] ?? '';
-if ($status === 'success') {
-    $amount      = $_SESSION['pending_donation']['amount']      ?? 0;
-    $name        = $_SESSION['pending_donation']['donor_name']  ?? 'Anonymous';
-    $msg         = $_SESSION['pending_donation']['message']     ?? '';
-    $anon        = $_SESSION['pending_donation']['is_anonymous']?? 0;
-    $user_id     = $_SESSION['user_id']                         ?? null;
-    $receiver_id = $_SESSION['pending_donation']['receiver_id'] ?? null;
-    if ($amount > 0) {
-        try {
-            $stmt = $pdo->prepare("INSERT INTO money_donations (donor_name, amount, message, is_anonymous, user_id, receiver_id, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $amount, $msg, $anon, $user_id, $receiver_id, $method]);
-            addNotification($pdo, 'Money Donation', "Rs. " . number_format($amount) . " from $name via $method");
-            setFlash('success', "Thank you! Your donation of Rs. " . number_format($amount) . " via " . ucfirst($method) . " was successful.");
-        } catch (PDOException $e) {
-            setFlash('error', 'Database error: ' . $e->getMessage());
-        }
-    } else {
-        renderPaymentFailure('Invalid Donation Amount', 'The payment amount was invalid, so the donation could not be recorded.', 'eSewa');
+if ($method === 'paypal') {
+    $orderId = $_GET['order_id'] ?? '';
+    $capture = $_SESSION['paypal_capture'] ?? null;
+    if ((($_GET['status'] ?? '') !== 'success') || $orderId === '' || $orderId !== ($_SESSION['paypal_order_id'] ?? '') || !is_array($capture)) {
+        renderPaymentFailure('PayPal Verification Failed', 'PayPal capture data was not available for this payment session.', 'PayPal');
     }
-} else {
-    renderPaymentFailure('Payment Failed', 'Payment was cancelled or failed. No donation was recorded.', ucfirst($method ?: 'Payment'));
+    if (($capture['status'] ?? '') !== 'COMPLETED') {
+        renderPaymentFailure('PayPal Payment Not Complete', 'PayPal did not return a completed capture status.', 'PayPal');
+    }
+
+    $captureInfo = $capture['purchase_units'][0]['payments']['captures'][0] ?? [];
+    $transactionId = (string) ($captureInfo['id'] ?? $orderId);
+    $capturedAmount = (float) ($captureInfo['amount']['value'] ?? 0);
+    $expectedAmount = (float) ($_SESSION['pending_donation']['amount'] ?? 0);
+    if (abs($capturedAmount - $expectedAmount) > 0.01) {
+        renderPaymentFailure('PayPal Amount Mismatch', 'The PayPal captured amount did not match the donation amount.', 'PayPal');
+    }
+
+    $saved = saveVerifiedDonation($pdo, 'paypal', $transactionId, PAYPAL_CURRENCY, '(Paid via PayPal ' . PAYPAL_CURRENCY . ')');
+    unset($_SESSION['pending_donation'], $_SESSION['paypal_order_id'], $_SESSION['paypal_capture']);
+    renderPaymentSuccess($saved['name'], $saved['amount'], $transactionId, 'PayPal', PAYPAL_CURRENCY);
 }
-redirect('donate_money.php');
+
+renderPaymentFailure('Payment Failed', 'Payment was cancelled or failed. No donation was recorded.', ucfirst($method ?: 'Payment'));
 ?>
