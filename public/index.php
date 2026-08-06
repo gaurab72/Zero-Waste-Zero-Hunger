@@ -67,14 +67,21 @@ try {
 
     <!-- Live Updates -->
     <aside class="live-alert-strip" aria-label="Live updates">
-        <div class="container live-updates">
-            <span class="live-updates-label"><span class="live-status-dot" aria-hidden="true"></span>Live updates</span>
-            <span>Fresh prepared meals rescued across Kathmandu Valley</span>
-            <span><strong class="live-update-fund">Rs. <?php echo number_format($total_money_raised); ?></strong> raised for cold storage transport and fuel</span>
-            <span>Volunteer logistics are dispatching food to local shelters</span>
+        <div class="live-updates-track">
+            <div class="live-updates">
+                <span class="live-updates-label"><span class="live-status-dot" aria-hidden="true"></span>Live updates</span>
+                <span>Fresh prepared meals rescued across Kathmandu Valley</span>
+                <span><strong class="live-update-fund">Rs. <?php echo number_format($total_money_raised); ?></strong> raised for cold storage transport and fuel</span>
+                <span>Volunteer logistics are dispatching food to local shelters</span>
+            </div>
+            <div class="live-updates" aria-hidden="true">
+                <span class="live-updates-label"><span class="live-status-dot"></span>Live updates</span>
+                <span>Fresh prepared meals rescued across Kathmandu Valley</span>
+                <span><strong class="live-update-fund">Rs. <?php echo number_format($total_money_raised); ?></strong> raised for cold storage transport and fuel</span>
+                <span>Volunteer logistics are dispatching food to local shelters</span>
+            </div>
         </div>
-    </aside>
-    <!-- Navigation -->
+    </aside>    <!-- Navigation -->
     <?php require_once 'includes/navbar.php'; ?>
 
     <!-- Clean Hero Section -->
@@ -392,7 +399,7 @@ try {
     <script>
     (function() {
         var feedContainer = document.getElementById('live-feed-container');
-        var liveFund = document.querySelector('.live-update-fund');
+        var liveFunds = document.querySelectorAll('.live-update-fund');
         var liveIndicator = document.querySelector('.live-alert-strip');
 
         function renderFeedCard(item) {
@@ -429,9 +436,9 @@ try {
                         }
                     }
                     // Update live funding figure
-                    if (liveFund) {
+                    liveFunds.forEach(function(liveFund) {
                         liveFund.textContent = 'Rs. ' + data.total_money;
-                    }
+                    });
 
                     // Flash indicator to show live update happened
                     if (liveIndicator) {

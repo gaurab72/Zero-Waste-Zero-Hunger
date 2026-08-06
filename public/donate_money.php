@@ -46,8 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initiate_pay_btn'])) 
         // Prepare eSewa request parameters according to eSewa v2 specs
         $txUuid      = '240806-' . time() . '-' . rand(100, 999);
         $totalAmount = number_format($amount, 2, '.', '');
-        $successUrl  = 'http://' . $_SERVER['HTTP_HOST'] . '/Modern_Food_Waste_System/public/payment_verify.php?method=esewa';
-        $failureUrl  = 'http://' . $_SERVER['HTTP_HOST'] . '/Modern_Food_Waste_System/public/payment_verify.php?method=esewa&status=failed';
+        $scheme     = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host       = $_SERVER['HTTP_HOST'];
+        if ($host === 'localhost:63342') {
+            $host = 'localhost';
+        }
+        $basePath   = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
+        $verifyUrl  = $scheme . '://' . $host . $basePath . '/payment_verify.php';
+        $successUrl  = $verifyUrl . '?method=esewa';
+        $failureUrl  = $verifyUrl . '?method=esewa&status=failed';
         
         $signedFields = 'total_amount,transaction_uuid,product_code';
         $signatureMessage = "total_amount={$totalAmount},transaction_uuid={$txUuid},product_code=" . ESEWA_PRODUCT_CODE;
