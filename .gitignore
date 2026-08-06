@@ -1,0 +1,33 @@
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+/config/db.php
+/config/oauth.php
+/config/sathi.php
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Runtime files and logs
+/logs/
+/storage/
+/cache/
+*.log
+
+# Editor and tooling state
+/.idea/
+/.vscode/
+/.cursor/
+/.agents/
+/.jetro/
+.mcp.json
+
+# OS files
+.DS_Store
+Thumbs.db

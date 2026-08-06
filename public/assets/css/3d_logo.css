@@ -1,0 +1,33 @@
+/* assets/css/3d_logo.css */
+
+/* 3D Container Setup */
+.logo-3d-container {
+    perspective: 1000px;
+    display: inline-block;
+}
+
+/* Base Logo Style */
+.logo-3d {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-style: preserve-3d;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+/* Admin Portal Specifics (Auto Rotation) */
+.admin-logo-3d {
+    animation: float-rotate 6s infinite ease-in-out;
+}
+
+@keyframes float-rotate {
+    0% { transform: translateY(0) rotateY(0deg) rotateX(0deg); filter: drop-shadow(0 5px 15px rgba(56, 189, 248, 0.4)); }
+    25% { transform: translateY(-10px) rotateY(10deg) rotateX(5deg); filter: drop-shadow(10px 15px 25px rgba(56, 189, 248, 0.6)); }
+    50% { transform: translateY(0) rotateY(0deg) rotateX(0deg); filter: drop-shadow(0 5px 15px rgba(56, 189, 248, 0.4)); }
+    75% { transform: translateY(-10px) rotateY(-10px) rotateX(5deg); filter: drop-shadow(-10px 15px 25px rgba(56, 189, 248, 0.6)); }
+    100% { transform: translateY(0) rotateY(0deg) rotateX(0deg); filter: drop-shadow(0 5px 15px rgba(56, 189, 248, 0.4)); }
+}
+
+/* Navbar Specifics (Interactive Hover) */
+.nav-logo-3d:hover {
+    transform: rotateY(180deg) scale(1.1);
+    filter: drop-shadow(0 0 10px var(--primary));
+}
