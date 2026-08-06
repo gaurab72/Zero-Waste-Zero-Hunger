@@ -65,17 +65,15 @@ try {
 }
 ?>
 
-    <!-- Live Alert Marquee Strip -->
-    <div class="live-alert-strip">
-        <div class="marquee-content" id="live-marquee">
-            <div class="marquee-item">LIVE UPDATES: Fresh prepared meals rescued across Kathmandu Valley</div>
-            <div class="marquee-item">Rs. <?php echo number_format($total_money_raised); ?> raised for cold storage transport & fuel</div>
-            <div class="marquee-item">Active volunteer logistics dispatching warm food to local shelters</div>
-            <div class="marquee-item">LIVE UPDATES: Fresh prepared meals rescued across Kathmandu Valley</div>
-            <div class="marquee-item">Rs. <?php echo number_format($total_money_raised); ?> raised for cold storage transport & fuel</div>
+    <!-- Live Updates -->
+    <aside class="live-alert-strip" aria-label="Live updates">
+        <div class="container live-updates">
+            <span class="live-updates-label"><span class="live-status-dot" aria-hidden="true"></span>Live updates</span>
+            <span>Fresh prepared meals rescued across Kathmandu Valley</span>
+            <span><strong class="live-update-fund">Rs. <?php echo number_format($total_money_raised); ?></strong> raised for cold storage transport and fuel</span>
+            <span>Volunteer logistics are dispatching food to local shelters</span>
         </div>
-    </div>
-
+    </aside>
     <!-- Navigation -->
     <?php require_once 'includes/navbar.php'; ?>
 
@@ -107,59 +105,6 @@ try {
                 </a>
             </div>
 
-        </div>
-    </section>
-
-    <!-- Quick Action Hub (4 Cards) -->
-    <section class="container" style="padding: 30px 0 50px;">
-        <div class="hub-grid">
-            <!-- Hub 1: Donors -->
-            <div class="hub-card">
-                <div>
-                    <div class="hub-icon">👨‍🍳</div>
-                    <h3 style="font-size: 1.25rem; margin-bottom: 10px; color: var(--text-main);">For Donors & Caterers</h3>
-                    <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 20px;">
-                        Have extra prepared food or party surplus? Post details, location, and pickup time.
-                    </p>
-                </div>
-                <a href="donate_food.php" class="btn btn-primary" style="width: 100%;">Post Food Listing &rarr;</a>
-            </div>
-
-            <!-- Hub 2: Financial Sewa -->
-            <div class="hub-card">
-                <div>
-                    <div class="hub-icon" style="color: #ffd700;">💰</div>
-                    <h3 style="font-size: 1.25rem; margin-bottom: 10px; color: var(--text-main);">Financial Sewa Fund</h3>
-                    <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 20px;">
-                        Support thermal food boxes, vehicle fuel, and emergency food relief packages.
-                    </p>
-                </div>
-                <a href="donate_money.php" class="btn btn-gold" style="width: 100%;">Contribute Sewa &rarr;</a>
-            </div>
-
-            <!-- Hub 3: Volunteers -->
-            <div class="hub-card">
-                <div>
-                    <div class="hub-icon" style="color: #38bdf8;">🚴</div>
-                    <h3 style="font-size: 1.25rem; margin-bottom: 10px; color: var(--text-main);">Logistics Transport</h3>
-                    <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 20px;">
-                        Volunteer drivers receive local alerts to pick up and deliver food safely.
-                    </p>
-                </div>
-                <a href="register.php?role=volunteer" class="btn btn-secondary" style="width: 100%;">Join Transport Corps &rarr;</a>
-            </div>
-
-            <!-- Hub 4: NGOs & Communities -->
-            <div class="hub-card">
-                <div>
-                    <div class="hub-icon" style="color: #f43f5e;">🏢</div>
-                    <h3 style="font-size: 1.25rem; margin-bottom: 10px; color: var(--text-main);">Shelters & Community NGOs</h3>
-                    <p style="color: var(--text-muted); font-size: 0.92rem; margin-bottom: 20px;">
-                        Get verified to receive instant alerts when fresh food is available nearby.
-                    </p>
-                </div>
-                <a href="register.php?role=ngo" class="btn btn-outline" style="width: 100%;">Register Organization &rarr;</a>
-            </div>
         </div>
     </section>
 
@@ -297,16 +242,7 @@ try {
                     <img src="assets/Images/esewa_logo.png" alt="eSewa Payment" style="height: 32px; object-fit: contain;">
                 </div>
                 <div style="background:#ffffff; padding: 8px 16px; border-radius: 10px; display:flex; align-items:center; justify-content:center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-                    <img src="assets/Images/connectips_logo.jpg" alt="ConnectIPS" style="height: 32px; object-fit: contain;">
-                </div>
-                <div style="background:#ffffff; padding: 8px 16px; border-radius: 10px; display:flex; align-items:center; justify-content:center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-                    <img src="assets/Images/bank_icon_modern.webp" alt="Direct Bank Transfer" style="height: 32px; object-fit: contain;">
-                </div>
-                <div style="background:#ffffff; padding: 8px 16px; border-radius: 10px; display:flex; align-items:center; justify-content:center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
                     <img src="assets/Images/paypal_logo.svg" alt="PayPal International" style="height: 32px; object-fit: contain;">
-                </div>
-                <div style="background:#ffffff; padding: 8px 16px; border-radius: 10px; display:flex; align-items:center; justify-content:center; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-                    <img src="assets/Images/payment_card_processed.jpg" alt="Credit / Debit Card" style="height: 32px; object-fit: contain;">
                 </div>
             </div>
         </div>
@@ -456,7 +392,7 @@ try {
     <script>
     (function() {
         var feedContainer = document.getElementById('live-feed-container');
-        var marquee = document.getElementById('live-marquee');
+        var liveFund = document.querySelector('.live-update-fund');
         var liveIndicator = document.querySelector('.live-alert-strip');
 
         function renderFeedCard(item) {
@@ -492,15 +428,9 @@ try {
                                 '<a href="donate_food.php" class="btn btn-primary" style="margin-top:12px;">Post New Food Listing</a></div>';
                         }
                     }
-
-                    // Update marquee money figure
-                    if (marquee) {
-                        var items = marquee.querySelectorAll('.marquee-item');
-                        items.forEach(function(el) {
-                            if (el.textContent.indexOf('raised') !== -1) {
-                                el.textContent = 'Rs. ' + data.total_money + ' raised for cold storage transport & fuel';
-                            }
-                        });
+                    // Update live funding figure
+                    if (liveFund) {
+                        liveFund.textContent = 'Rs. ' + data.total_money;
                     }
 
                     // Flash indicator to show live update happened

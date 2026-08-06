@@ -122,43 +122,56 @@ h5 {
     padding: 0 24px;
 }
 
-/* Live Alert Marquee Strip */
+/* Live Updates */
 .live-alert-strip {
     background: rgba(16, 185, 129, 0.12);
     border-bottom: 1px solid rgba(16, 185, 129, 0.25);
-    padding: 8px 0;
-    overflow: hidden;
-    white-space: nowrap;
+    padding: 10px 0;
     position: relative;
     font-size: 0.88rem;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--text-muted);
+    transition: opacity 0.2s ease;
 }
 
-.marquee-content {
-    display: inline-flex;
-    gap: 40px;
-    animation: marqueeScroll 28s linear infinite;
+.live-updates {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
-.marquee-content:hover {
-    animation-play-state: paused;
+.live-updates > span:not(:first-child)::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    margin: 0 20px 2px 0;
+    border-radius: 50%;
+    background: var(--primary);
 }
 
-@keyframes marqueeScroll {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-50%);
-    }
-}
-
-.marquee-item {
+.live-updates-label {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    color: var(--primary);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.live-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.live-update-fund {
+    color: var(--text-main);
 }
 
 /* Buttons */
@@ -471,6 +484,19 @@ h5 {
 
     .hero-title {
         font-size: 2.8rem !important;
+    }
+
+    .live-updates {
+        justify-content: flex-start;
+        gap: 7px 0;
+    }
+
+    .live-updates > span:not(:first-child) {
+        width: 100%;
+    }
+
+    .live-updates > span:not(:first-child)::before {
+        margin-right: 8px;
     }
 
     .calc-container {
