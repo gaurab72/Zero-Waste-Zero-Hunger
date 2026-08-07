@@ -81,13 +81,23 @@ try {
                 <span>Volunteer logistics are dispatching food to local shelters</span>
             </div>
         </div>
-    </aside>    <!-- Navigation -->
+    </aside>
+
+    <!-- Navigation -->
     <?php require_once 'includes/navbar.php'; ?>
+
+    <?php $flash = getFlash(); ?>
+    <?php if ($flash): ?>
+        <div class="container" style="margin-top: 20px;">
+            <div style="padding: 16px 24px; border-radius: 12px; border: 1px solid var(--success, #10b981); color: var(--success, #10b981); background: rgba(16, 185, 129, 0.12); font-weight: 600; font-size: 1.05rem; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
+                <?php echo htmlspecialchars($flash['message']); ?>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- Clean Hero Section -->
     <section class="hero-section container" style="margin-top: 40px; padding-bottom: 50px;">
         <div class="hero-content" style="max-width: 820px; margin: 0 auto; text-align: center;">
-            
             <h1 class="hero-title" style="font-size: 4.2rem; margin-bottom: 24px; line-height: 1.15;">
                 Share Surplus Food.<br>
                 <span class="text-gradient">Bridge Hunger & Hope in Nepal.</span>

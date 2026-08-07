@@ -108,6 +108,46 @@ function formatCurrency($amount) {
     return "Rs. " . number_format($amount, 2);
 }
 
+function httpPostJson(string $url, array $payload, array $headers = []): array {
+    $body = json_encode($payload);
+    $headers[] = 'Content-Type: application/json';
+
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+        ]);
+        $raw = curl_exec($curl);
+        $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", $headers),
+                'content' => $body,
+                'timeout' => 30,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
+        $code = 0;
+        $error = '';
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
+            $code = (int) $matches[1];
+        }
+    }
+
+    $data = json_decode((string) $raw, true);
+    return ['code' => $code, 'body' => is_array($data) ? $data : [], 'raw' => (string) $raw, 'error' => $error];
+}
 
 // System Usage Tracking (NGO Consumption)
 function logFoodAction($pdo, $listing_id, $ngo_id, $action, $details = '') {

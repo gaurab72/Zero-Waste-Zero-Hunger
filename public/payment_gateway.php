@@ -15,50 +15,8 @@ function paymentJson(int $status, array $payload): void {
     exit;
 }
 
-function paymentPostJson(string $url, array $payload, array $headers = [], ?string $basicUser = null, ?string $basicPass = null): array {
-    $body = json_encode($payload);
-    $headers[] = 'Content-Type: application/json';
-
-    if (function_exists('curl_init')) {
-        $curl = curl_init($url);
-        curl_setopt_array($curl, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $body,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 30,
-        ]);
-        if ($basicUser !== null && $basicPass !== null) {
-            curl_setopt($curl, CURLOPT_USERPWD, $basicUser . ':' . $basicPass);
-        }
-        $raw = curl_exec($curl);
-        $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-    } else {
-        $headerText = implode("\r\n", $headers);
-        if ($basicUser !== null && $basicPass !== null) {
-            $headerText .= "\r\nAuthorization: Basic " . base64_encode($basicUser . ':' . $basicPass);
-        }
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => $headerText,
-                'content' => $body,
-                'timeout' => 30,
-                'ignore_errors' => true,
-            ],
-        ]);
-        $raw = @file_get_contents($url, false, $context);
-        $code = 0;
-        $error = '';
-        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
-            $code = (int) $matches[1];
-        }
-    }
-
-    $data = json_decode((string) $raw, true);
-    return ['code' => $code, 'body' => is_array($data) ? $data : [], 'raw' => $raw, 'error' => $error ?? ''];
+function paymentPostJson(string $url, array $payload, array $headers = []): array {
+    return httpPostJson($url, $payload, $headers);
 }
 
 function paypalAccessToken(): string {
@@ -66,7 +24,7 @@ function paypalAccessToken(): string {
         paymentJson(500, ['error' => 'PayPal sandbox credentials are not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.']);
     }
 
-    $headers = ['Accept: application/json', 'Accept-Language: en_US'];
+    $headers = ['Accept: application/json', 'Accept-Language: en_US', 'Content-Type: application/x-www-form-urlencoded'];
     $body = 'grant_type=client_credentials';
 
     if (function_exists('curl_init')) {
@@ -86,7 +44,7 @@ function paypalAccessToken(): string {
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
-                'header' => implode("\r\n", $headers) . "\r\nContent-Type: application/x-www-form-urlencoded\r\nAuthorization: Basic " . base64_encode(PAYPAL_CLIENT_ID . ':' . PAYPAL_CLIENT_SECRET),
+                'header' => implode("\r\n", $headers) . "\r\nAuthorization: Basic " . base64_encode(PAYPAL_CLIENT_ID . ':' . PAYPAL_CLIENT_SECRET),
                 'content' => $body,
                 'timeout' => 30,
                 'ignore_errors' => true,
@@ -101,7 +59,9 @@ function paypalAccessToken(): string {
 
     $data = json_decode((string) $raw, true);
     if ($code < 200 || $code >= 300 || empty($data['access_token'])) {
-        paymentJson(502, ['error' => 'Unable to authenticate with PayPal. Check PayPal credentials and mode.']);
+        $errorDetail = $data['error_description'] ?? ($data['error'] ?? 'Unknown error');
+        error_log('PayPal token error HTTP ' . $code . ': ' . $errorDetail);
+        paymentJson(502, ['error' => 'Unable to authenticate with PayPal. ' . $errorDetail]);
     }
 
     return $data['access_token'];
@@ -146,6 +106,7 @@ if ($action === 'paypal_create') {
     ];
 
     $accessToken = paypalAccessToken();
+    error_log('PayPal create order for amount: ' . $amount . ' ' . PAYPAL_CURRENCY);
     $response = paymentPostJson(PAYPAL_BASE_URL . '/v2/checkout/orders', [
         'intent' => 'CAPTURE',
         'purchase_units' => [[
@@ -168,14 +129,19 @@ if ($action === 'paypal_create') {
 
 if ($action === 'paypal_capture') {
     $orderId = trim((string) ($input['order_id'] ?? ''));
-    if ($orderId === '' || $orderId !== ($_SESSION['paypal_order_id'] ?? '')) {
-        paymentJson(422, ['error' => 'PayPal order session did not match.']);
+    if ($orderId === '') {
+        paymentJson(422, ['error'] => 'PayPal order ID is required.']);
+    }
+    if (empty($_SESSION['paypal_order_id'])) {
+        $_SESSION['paypal_order_id'] = $orderId;
     }
 
     $accessToken = paypalAccessToken();
+    error_log('PayPal capture order: ' . $orderId);
     $response = paymentPostJson(PAYPAL_BASE_URL . '/v2/checkout/orders/' . rawurlencode($orderId) . '/capture', [], ['Authorization: Bearer ' . $accessToken]);
 
     if ($response['code'] < 200 || $response['code'] >= 300) {
+        error_log('PayPal capture failed HTTP ' . $response['code'] . ': ' . $response['raw']);
         paymentJson(502, ['error' => 'PayPal could not capture the order.', 'details' => $response['body']]);
     }
 

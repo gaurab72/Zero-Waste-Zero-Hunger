@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_btn'])) {
 
     if ($user && password_verify($password, $user['password_hash'])) {
         error_log("Login SUCCESS for: " . $email);
+        session_regenerate_id(true);
         
         // STRICT LOGIN SEPARATION
         if ($login_type === 'admin') {

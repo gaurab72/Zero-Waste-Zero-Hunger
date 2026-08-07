@@ -146,5 +146,4 @@ function isActive($page) {
 })();
 </script>
 <script src="assets/js/theme.js"></script>
-<?php include_once 'sathi_widget.php'; ?>
 
